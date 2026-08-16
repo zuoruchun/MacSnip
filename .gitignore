@@ -1,0 +1,23 @@
+# Swift build artifacts
+.build/
+build/
+
+# Xcode
+*.xcodeproj/
+xcuserdata/
+*.xcworkspace/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+*.swp
+*.swo
+
+# Keychain / secrets
+*.pem
+*.p12
+*.key
+
+# Session logs (local only)
+_codex_sessions/
