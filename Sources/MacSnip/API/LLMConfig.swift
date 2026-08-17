@@ -10,9 +10,9 @@ public enum LLMProviderFormat: String, Codable, CaseIterable, Identifiable {
     public var displayName: String {
         switch self {
         case .openAICompatible:
-            return "OpenAI 兼容 (/v1/chat)"
+            return "OpenAI 兼容"
         case .anthropicNative:
-            return "Anthropic 原生 (/v1/messages)"
+            return "Anthropic 原生"
         }
     }
 }

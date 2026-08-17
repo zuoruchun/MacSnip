@@ -18,7 +18,7 @@ public enum LLMServiceError: LocalizedError {
         case .networkError(let message):
             return "网络请求失败: \(message)"
         case .httpError(let statusCode, let message):
-            return "API 请求错误 (HTTP \(statusCode)): \(message)"
+            return "API 响应错误 (HTTP \(statusCode)): \(message)"
         case .invalidResponse:
             return "服务器返回了无效的数据格式。"
         case .decodingError(let message):
@@ -62,26 +62,44 @@ public final class LLMService {
     
     // MARK: - OpenAI 兼容格式
     
+    /// 智能拼接 OpenAI 兼容接口 endpoint
+    private func buildOpenAIEndpoint(from baseURL: String) -> String {
+        var base = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        while base.hasSuffix("/") {
+            base.removeLast()
+        }
+        
+        // 1. 如果用户已填写完整的 chat/completions 路径，直接使用
+        if base.hasSuffix("/chat/completions") {
+            return base
+        }
+        
+        guard let url = URL(string: base) else {
+            return "\(base)/chat/completions"
+        }
+        
+        let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        // 2. 如果路径已经包含版本段或已有 path（例如 "api/paas/v4" 或 "compatible-mode/v1" 或 "v1"）
+        if !path.isEmpty {
+            return "\(base)/chat/completions"
+        } else {
+            // 3. 纯域名（如 https://api.openai.com 或 https://api.deepseek.com）
+            return "\(base)/v1/chat/completions"
+        }
+    }
+    
     private func requestOpenAI(
         text: String,
         profile: LLMProfile,
         apiKey: String
     ) async throws -> String {
-        var base = profile.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        if base.hasSuffix("/") {
-            base.removeLast()
-        }
-        
-        let endpoint: String
-        if base.hasSuffix("/v1") || base.hasSuffix("/v1/chat/completions") {
-            endpoint = base.hasSuffix("/v1/chat/completions") ? base : "\(base)/chat/completions"
-        } else {
-            endpoint = "\(base)/v1/chat/completions"
-        }
+        let endpoint = buildOpenAIEndpoint(from: profile.baseURL)
         
         guard let url = URL(string: endpoint) else {
             throw LLMServiceError.invalidURL(endpoint)
         }
+        
+        print("[AI Request] URL: \(endpoint) | Method: POST | Model: \(profile.modelName) | Key: \(maskAPIKey(apiKey))")
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -108,15 +126,22 @@ public final class LLMService {
             throw LLMServiceError.invalidResponse
         }
         
+        print("[AI Response] Status: \(httpResponse.statusCode) | Bytes: \(data.count)")
+        
         if !(200...299).contains(httpResponse.statusCode) {
-            let errorMsg = String(data: data, encoding: .utf8) ?? "未知错误"
-            throw LLMServiceError.httpError(statusCode: httpResponse.statusCode, message: errorMsg)
+            let errorBody = String(data: data, encoding: .utf8) ?? ""
+            print("[AI Response Error] Body: \(errorBody)")
+            
+            // 提取结构化错误信息
+            let parsedMessage = parseErrorMessage(from: data) ?? errorBody
+            throw LLMServiceError.httpError(statusCode: httpResponse.statusCode, message: parsedMessage)
         }
         
         struct OpenAIResponse: Decodable {
             struct Choice: Decodable {
                 struct Message: Decodable {
                     let content: String?
+                    let reasoning_content: String?
                 }
                 let message: Message?
             }
@@ -125,37 +150,59 @@ public final class LLMService {
         
         do {
             let decoded = try JSONDecoder().decode(OpenAIResponse.self, from: data)
-            guard let content = decoded.choices?.first?.message?.content?.trimmingCharacters(in: .whitespacesAndNewlines), !content.isEmpty else {
+            let rawContent = decoded.choices?.first?.message?.content?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let fallbackContent = decoded.choices?.first?.message?.reasoning_content?.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            guard let content = (rawContent?.isEmpty == false ? rawContent : fallbackContent), !content.isEmpty else {
                 throw LLMServiceError.emptyResult
             }
             return content
+        } catch let err as LLMServiceError {
+            throw err
         } catch {
-            throw LLMServiceError.decodingError(error.localizedDescription)
+            let rawBody = String(data: data, encoding: .utf8) ?? ""
+            print("[AI Decoding Error] \(error.localizedDescription) | Raw: \(rawBody)")
+            throw LLMServiceError.decodingError("解析响应失败: \(error.localizedDescription)")
         }
     }
     
     // MARK: - Anthropic 原生格式
+    
+    /// 智能拼接 Anthropic 原生接口 endpoint
+    private func buildAnthropicEndpoint(from baseURL: String) -> String {
+        var base = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        while base.hasSuffix("/") {
+            base.removeLast()
+        }
+        
+        if base.hasSuffix("/messages") {
+            return base
+        }
+        
+        guard let url = URL(string: base) else {
+            return "\(base)/messages"
+        }
+        
+        let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if !path.isEmpty {
+            return "\(base)/messages"
+        } else {
+            return "\(base)/v1/messages"
+        }
+    }
     
     private func requestAnthropic(
         text: String,
         profile: LLMProfile,
         apiKey: String
     ) async throws -> String {
-        var base = profile.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        if base.hasSuffix("/") {
-            base.removeLast()
-        }
-        
-        let endpoint: String
-        if base.hasSuffix("/v1") || base.hasSuffix("/v1/messages") {
-            endpoint = base.hasSuffix("/v1/messages") ? base : "\(base)/messages"
-        } else {
-            endpoint = "\(base)/v1/messages"
-        }
+        let endpoint = buildAnthropicEndpoint(from: profile.baseURL)
         
         guard let url = URL(string: endpoint) else {
             throw LLMServiceError.invalidURL(endpoint)
         }
+        
+        print("[AI Request] URL: \(endpoint) | Method: POST | Model: \(profile.modelName) | Key: \(maskAPIKey(apiKey))")
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -184,9 +231,14 @@ public final class LLMService {
             throw LLMServiceError.invalidResponse
         }
         
+        print("[AI Response] Status: \(httpResponse.statusCode) | Bytes: \(data.count)")
+        
         if !(200...299).contains(httpResponse.statusCode) {
-            let errorMsg = String(data: data, encoding: .utf8) ?? "未知错误"
-            throw LLMServiceError.httpError(statusCode: httpResponse.statusCode, message: errorMsg)
+            let errorBody = String(data: data, encoding: .utf8) ?? ""
+            print("[AI Response Error] Body: \(errorBody)")
+            
+            let parsedMessage = parseErrorMessage(from: data) ?? errorBody
+            throw LLMServiceError.httpError(statusCode: httpResponse.statusCode, message: parsedMessage)
         }
         
         struct AnthropicResponse: Decodable {
@@ -208,8 +260,12 @@ public final class LLMService {
                 throw LLMServiceError.emptyResult
             }
             return result
+        } catch let err as LLMServiceError {
+            throw err
         } catch {
-            throw LLMServiceError.decodingError(error.localizedDescription)
+            let rawBody = String(data: data, encoding: .utf8) ?? ""
+            print("[AI Decoding Error] \(error.localizedDescription) | Raw: \(rawBody)")
+            throw LLMServiceError.decodingError("解析响应失败: \(error.localizedDescription)")
         }
     }
     
@@ -219,5 +275,27 @@ public final class LLMService {
         } catch {
             throw LLMServiceError.networkError(error.localizedDescription)
         }
+    }
+    
+    // MARK: - 辅助方法
+    
+    private func maskAPIKey(_ key: String) -> String {
+        guard key.count > 8 else { return "******" }
+        let prefix = key.prefix(4)
+        let suffix = key.suffix(4)
+        return "\(prefix)...\(suffix)"
+    }
+    
+    private func parseErrorMessage(from data: Data) -> String? {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        if let errorObj = json["error"] as? [String: Any], let msg = errorObj["message"] as? String, !msg.isEmpty {
+            return msg
+        }
+        if let msg = json["message"] as? String, !msg.isEmpty {
+            return msg
+        }
+        return nil
     }
 }
