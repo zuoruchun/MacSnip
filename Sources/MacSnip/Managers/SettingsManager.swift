@@ -15,7 +15,7 @@ public final class SettingsManager: ObservableObject {
     private let presetsVersionKey = "com.macsnip.settings.presetsVersion"
     
     /// 每次更新预置模板时递增此版本号，触发自动刷新
-    private let currentPresetsVersion = 3
+    private let currentPresetsVersion = 4
     
     @Published public var profiles: [LLMProfile] = [] {
         didSet {

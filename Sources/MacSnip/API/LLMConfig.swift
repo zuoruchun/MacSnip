@@ -76,12 +76,23 @@ public struct LLMPresetTemplate: Identifiable {
             notes: "智谱最新轻量免费模型，极速响应"
         ),
         
-        // 3. 阿里云通义千问 Qwen3.7-Flash — 目前最低价
+        // 3. 阿里云通用翻译（通义翻译 Qwen-MT-Turbo）— 专用机器翻译大模型
+        LLMPresetTemplate(
+            id: "aliyun_qwen_mt",
+            title: "通义翻译 Qwen-MT",
+            defaultName: "通义翻译",
+            defaultBaseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            defaultModelName: "qwen-mt-turbo",
+            format: .openAICompatible,
+            notes: "阿里云百炼专用翻译模型，专精多语言通用互译"
+        ),
+        
+        // 4. 阿里云通义千问 Qwen3.7-Flash — 目前最低价
         LLMPresetTemplate(
             id: "qwen_flash",
             title: "通义千问 Qwen3.7-Flash",
             defaultName: "Qwen",
-            defaultBaseURL: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+            defaultBaseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
             defaultModelName: "qwen3.7-flash",
             format: .openAICompatible,
             notes: "$0.03/$0.13 per 1M tokens，Qwen3 系列最便宜"

@@ -87,8 +87,9 @@ chmod +x scripts/build_app.sh
 
 | 供应商 | 模型 | 获取 API Key |
 |:---|:---|:---|
-| DeepSeek | `deepseek-v4-flash` | [platform.deepseek.com](https://platform.deepseek.com) |
 | 智谱 GLM | `glm-4.7-flash`（免费） | [open.bigmodel.cn](https://open.bigmodel.cn) |
+| 通义翻译 | `qwen-mt-turbo`（阿里云专用翻译） | [dashscope.console.aliyun.com](https://dashscope.console.aliyun.com) |
+| DeepSeek | `deepseek-v4-flash` | [platform.deepseek.com](https://platform.deepseek.com) |
 | 通义千问 | `qwen3.7-flash` | [dashscope.console.aliyun.com](https://dashscope.console.aliyun.com) |
 | OpenAI | `gpt-5.6-luna` | [platform.openai.com](https://platform.openai.com) |
 | Claude | `claude-haiku-4-5-20251001` | [console.anthropic.com](https://console.anthropic.com) |
