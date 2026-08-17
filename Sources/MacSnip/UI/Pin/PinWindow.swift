@@ -185,8 +185,7 @@ private final class PinContainerView: NSView {
     }
     
     @objc private func copyImage() {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.writeObjects([image])
+        ImageExportManager.writeToPasteboard(image)
     }
     
     @objc private func saveAsFile() {
@@ -196,9 +195,7 @@ private final class PinContainerView: NSView {
         
         savePanel.begin { [weak self] result in
             guard result == .OK, let url = savePanel.url, let self = self else { return }
-            if let tiffData = self.image.tiffRepresentation,
-               let bitmapRep = NSBitmapImageRep(data: tiffData),
-               let pngData = bitmapRep.representation(using: .png, properties: [:]) {
+            if let pngData = ImageExportManager.pngData(from: self.image) {
                 try? pngData.write(to: url)
             }
         }

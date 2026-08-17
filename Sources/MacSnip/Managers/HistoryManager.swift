@@ -82,19 +82,8 @@ public final class HistoryManager: ObservableObject {
         let imageFileURL = historyDirectory.appendingPathComponent(imageFileName)
         let jsonFileURL = historyDirectory.appendingPathComponent(jsonFileName)
         
-        // 转换并写入 PNG（优先从 CGImage 获取，确保按完整物理像素无损保存）
-        let pngData: Data
-        if let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
-            let bitmapRep = NSBitmapImageRep(cgImage: cgImage)
-            guard let data = bitmapRep.representation(using: .png, properties: [:]) else {
-                throw NSError(domain: "com.macsnip.history", code: -1, userInfo: [NSLocalizedDescriptionKey: "无法将图像编码为 PNG"])
-            }
-            pngData = data
-        } else if let tiffData = image.tiffRepresentation,
-                  let bitmapRep = NSBitmapImageRep(data: tiffData),
-                  let data = bitmapRep.representation(using: .png, properties: [:]) {
-            pngData = data
-        } else {
+        // 保留物理像素与 point 尺寸，使 Retina PNG 携带正确的高 DPI 语义
+        guard let pngData = ImageExportManager.pngData(from: image) else {
             throw NSError(domain: "com.macsnip.history", code: -1, userInfo: [NSLocalizedDescriptionKey: "无法将图像编码为 PNG"])
         }
         

@@ -375,8 +375,7 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         NSGraphicsContext.current = context
         let cgContext = context.cgContext
         
-        // 缩放到物理像素坐标系进行矢量与高清绘制
-        cgContext.scaleBy(x: scale, y: scale)
+        // rep.size 已建立 point 到物理像素的映射，避免再次缩放 CTM
         
         // 1. 绘制高清底图
         baseImage.draw(in: bounds)

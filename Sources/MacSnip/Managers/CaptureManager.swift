@@ -242,14 +242,7 @@ final class CaptureManager: NSObject, CaptureOverlayViewDelegate {
     }
     
     private func copyToPasteboard(image: NSImage) {
-        NSPasteboard.general.clearContents()
-        if let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
-            let bitmapRep = NSBitmapImageRep(cgImage: cgImage)
-            if let pngData = bitmapRep.representation(using: .png, properties: [:]) {
-                NSPasteboard.general.setData(pngData, forType: .png)
-            }
-        }
-        NSPasteboard.general.writeObjects([image])
+        ImageExportManager.writeToPasteboard(image)
     }
     
     func showTranslationPanel(sourceText: String) {

@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/macOS-13%2B-blue?logo=apple" />
   <img src="https://img.shields.io/badge/Swift-5.9%2B-orange?logo=swift" />
   <img src="https://img.shields.io/badge/license-MIT-green" />
-  <img src="https://img.shields.io/badge/version-1.0.0-lightgrey" />
+  <img src="https://img.shields.io/badge/version-1.1.0-lightgrey" />
 </p>
 
 ---
@@ -46,8 +46,8 @@
 ### 方法一：直接下载（推荐）
 
 1. 前往 [Releases](../../releases) 页面
-2. 下载最新版 `MacSnip.app.zip`
-3. 解压后拖入 `/Applications` 文件夹
+2. 下载最新版 `MacSnip-v1.1.0-macOS-arm64.zip`
+3. 解压后将 `MacSnip.app` 拖入 `/Applications` 文件夹
 4. 首次运行需在 **系统设置 → 隐私与安全性 → 屏幕录制** 中授权 MacSnip
 
 ### 方法二：从源码编译

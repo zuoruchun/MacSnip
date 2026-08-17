@@ -157,8 +157,7 @@ private struct HistoryCardView: View {
                 // 快捷操作按钮
                 Button(action: {
                     if let img = HistoryManager.shared.loadImage(for: item) {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.writeObjects([img])
+                        ImageExportManager.writeToPasteboard(img)
                         ToastHUD.shared.show(message: "已复制到剪贴板", systemImage: "doc.on.doc.fill")
                     }
                 }) {
@@ -275,8 +274,7 @@ private struct HistoryDetailSheet: View {
                 
                 Button("复制图片") {
                     if let img = HistoryManager.shared.loadImage(for: item) {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.writeObjects([img])
+                        ImageExportManager.writeToPasteboard(img)
                         ToastHUD.shared.show(message: "已复制到剪贴板", systemImage: "doc.on.doc.fill")
                     }
                 }

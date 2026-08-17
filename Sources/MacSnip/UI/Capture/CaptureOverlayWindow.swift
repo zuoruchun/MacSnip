@@ -9,8 +9,7 @@ final class CaptureOverlayWindow: NSWindow {
         self.overlayView = CaptureOverlayView(
             frame: NSRect(origin: .zero, size: screenFrame.size),
             backgroundImage: backgroundImage,
-            backgroundCGImage: backgroundCGImage,
-            screenBackingScaleFactor: screen.backingScaleFactor
+            backgroundCGImage: backgroundCGImage
         )
         
         super.init(

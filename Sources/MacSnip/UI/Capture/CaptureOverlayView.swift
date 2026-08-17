@@ -11,7 +11,8 @@ final class CaptureOverlayView: NSView {
     
     private let backgroundImage: NSImage
     private let backgroundCGImage: CGImage
-    private let screenBackingScaleFactor: CGFloat
+    private let pixelScaleX: CGFloat
+    private let pixelScaleY: CGFloat
     private let screenHeight: CGFloat
     private var selectionRect: NSRect = .zero
     private var isSelecting = false
@@ -32,17 +33,18 @@ final class CaptureOverlayView: NSView {
         case none, topLeft, topMiddle, topRight, middleLeft, middleRight, bottomLeft, bottomMiddle, bottomRight
     }
     
-    init(frame: NSRect, backgroundImage: NSImage, backgroundCGImage: CGImage, screenBackingScaleFactor: CGFloat) {
+    init(frame: NSRect, backgroundImage: NSImage, backgroundCGImage: CGImage) {
         self.backgroundImage = backgroundImage
         self.backgroundCGImage = backgroundCGImage
-        self.screenBackingScaleFactor = screenBackingScaleFactor
+        self.pixelScaleX = CGFloat(backgroundCGImage.width) / max(frame.width, 1)
+        self.pixelScaleY = CGFloat(backgroundCGImage.height) / max(frame.height, 1)
         self.screenHeight = frame.height
         super.init(frame: frame)
         
         // 【核心修复 3】直接使用 CALayer 硬件加速呈现物理底图，杜绝 NSImage.draw 重采样与拉伸错位
         self.wantsLayer = true
         self.layer?.contents = backgroundCGImage
-        self.layer?.contentsScale = screenBackingScaleFactor
+        self.layer?.contentsScale = max(pixelScaleX, pixelScaleY)
         self.layer?.contentsGravity = .resizeAspectFill
         
         setupTrackingArea()
@@ -294,37 +296,8 @@ final class CaptureOverlayView: NSView {
             context.setLineWidth(2.0)
             context.stroke(selectionRect)
             
-            if !isAnnotating {
-                // 绘制 8 个控制手柄
-                drawHandles(in: context)
-            }
-            
             // 绘制尺寸提示标签 (W x H)
             drawDimensionLabel(in: context)
-        }
-    }
-    
-    private func drawHandles(in context: CGContext) {
-        let handleSize: CGFloat = 6
-        let points: [CGPoint] = [
-            CGPoint(x: selectionRect.minX, y: selectionRect.maxY),
-            CGPoint(x: selectionRect.midX, y: selectionRect.maxY),
-            CGPoint(x: selectionRect.maxX, y: selectionRect.maxY),
-            CGPoint(x: selectionRect.minX, y: selectionRect.midY),
-            CGPoint(x: selectionRect.maxX, y: selectionRect.midY),
-            CGPoint(x: selectionRect.minX, y: selectionRect.minY),
-            CGPoint(x: selectionRect.midX, y: selectionRect.minY),
-            CGPoint(x: selectionRect.maxX, y: selectionRect.minY)
-        ]
-        
-        context.setFillColor(NSColor.white.cgColor)
-        context.setStrokeColor(NSColor.systemBlue.cgColor)
-        context.setLineWidth(1.5)
-        
-        for pt in points {
-            let rect = CGRect(x: pt.x - handleSize / 2, y: pt.y - handleSize / 2, width: handleSize, height: handleSize)
-            context.fill(rect)
-            context.stroke(rect)
         }
     }
     
@@ -415,7 +388,7 @@ final class CaptureOverlayView: NSView {
         let canvas = AnnotationCanvasView(
             frame: selectionRect,
             baseImage: croppedImage,
-            scale: screenBackingScaleFactor
+            scale: max(pixelScaleX, pixelScaleY)
         )
         canvas.onCancelRequested = { [weak self] in
             self?.exitAnnotationMode()
@@ -468,16 +441,20 @@ final class CaptureOverlayView: NSView {
     private func cropSelectedImage() -> NSImage? {
         guard selectionRect.width > 0 && selectionRect.height > 0 else { return nil }
         
-        let scale = screenBackingScaleFactor
         let roundedRect = selectionRect.standardized
         
-        // 转换成物理像素坐标并四舍五入取整，消除浮点坐标插值与灰边误差
-        let px = max(0, min(CGFloat(backgroundCGImage.width), round(roundedRect.origin.x * scale)))
-        let py = max(0, min(CGFloat(backgroundCGImage.height), round((screenHeight - roundedRect.maxY) * scale)))
-        let pw = max(1, min(CGFloat(backgroundCGImage.width) - px, round(roundedRect.width * scale)))
-        let ph = max(1, min(CGFloat(backgroundCGImage.height) - py, round(roundedRect.height * scale)))
-        
-        let pixelRect = CGRect(x: px, y: py, width: pw, height: ph)
+        // 由实际捕获图像与当前 overlay 的尺寸推导每个屏幕的像素比例
+        let minPixelX = max(0, min(CGFloat(backgroundCGImage.width), round(roundedRect.minX * pixelScaleX)))
+        let maxPixelX = max(0, min(CGFloat(backgroundCGImage.width), round(roundedRect.maxX * pixelScaleX)))
+        let minPixelY = max(0, min(CGFloat(backgroundCGImage.height), round((screenHeight - roundedRect.maxY) * pixelScaleY)))
+        let maxPixelY = max(0, min(CGFloat(backgroundCGImage.height), round((screenHeight - roundedRect.minY) * pixelScaleY)))
+
+        let pixelRect = CGRect(
+            x: minPixelX,
+            y: minPixelY,
+            width: max(1, maxPixelX - minPixelX),
+            height: max(1, maxPixelY - minPixelY)
+        )
         guard let croppedCG = backgroundCGImage.cropping(to: pixelRect) else { return nil }
         
         return NSImage(cgImage: croppedCG, size: roundedRect.size)

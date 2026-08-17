@@ -35,7 +35,7 @@ public struct SettingsView: View {
                 Text("MacSnip")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.secondary)
-                Text("v1.0.0")
+                Text("v1.1.0")
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(.secondary)
                 Spacer()
