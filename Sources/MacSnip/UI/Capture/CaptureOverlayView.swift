@@ -10,6 +10,9 @@ final class CaptureOverlayView: NSView {
     weak var delegate: CaptureOverlayViewDelegate?
     
     private let backgroundImage: NSImage
+    private let backgroundCGImage: CGImage
+    private let screenBackingScaleFactor: CGFloat
+    private let screenHeight: CGFloat
     private var selectionRect: NSRect = .zero
     private var isSelecting = false
     private var isMovingSelection = false
@@ -29,10 +32,19 @@ final class CaptureOverlayView: NSView {
         case none, topLeft, topMiddle, topRight, middleLeft, middleRight, bottomLeft, bottomMiddle, bottomRight
     }
     
-    init(frame: NSRect, backgroundImage: NSImage) {
+    init(frame: NSRect, backgroundImage: NSImage, backgroundCGImage: CGImage, screenBackingScaleFactor: CGFloat) {
         self.backgroundImage = backgroundImage
+        self.backgroundCGImage = backgroundCGImage
+        self.screenBackingScaleFactor = screenBackingScaleFactor
+        self.screenHeight = frame.height
         super.init(frame: frame)
+        
+        // 【核心修复 3】直接使用 CALayer 硬件加速呈现物理底图，杜绝 NSImage.draw 重采样与拉伸错位
         self.wantsLayer = true
+        self.layer?.contents = backgroundCGImage
+        self.layer?.contentsScale = screenBackingScaleFactor
+        self.layer?.contentsGravity = .resizeAspectFill
+        
         setupTrackingArea()
     }
     
@@ -264,8 +276,7 @@ final class CaptureOverlayView: NSView {
         super.draw(dirtyRect)
         guard let context = NSGraphicsContext.current?.cgContext else { return }
         
-        // 1. 绘制底图
-        backgroundImage.draw(in: bounds)
+        // 底图已由 CALayer.contents 高性能原生渲染，无需在 draw 里重复绘制
         
         // 2. 绘制选区阴影与边界 (只有选区非空时才绘制四周暗色阴影)
         if !selectionRect.isEmpty {
@@ -401,7 +412,11 @@ final class CaptureOverlayView: NSView {
         
         guard let croppedImage = cropSelectedImage() else { return }
         
-        let canvas = AnnotationCanvasView(frame: selectionRect, baseImage: croppedImage)
+        let canvas = AnnotationCanvasView(
+            frame: selectionRect,
+            baseImage: croppedImage,
+            scale: screenBackingScaleFactor
+        )
         canvas.onCancelRequested = { [weak self] in
             self?.exitAnnotationMode()
         }
@@ -453,16 +468,19 @@ final class CaptureOverlayView: NSView {
     private func cropSelectedImage() -> NSImage? {
         guard selectionRect.width > 0 && selectionRect.height > 0 else { return nil }
         
-        let cropped = NSImage(size: selectionRect.size)
-        cropped.lockFocus()
-        backgroundImage.draw(
-            in: NSRect(origin: .zero, size: selectionRect.size),
-            from: selectionRect,
-            operation: .copy,
-            fraction: 1.0
-        )
-        cropped.unlockFocus()
-        return cropped
+        let scale = screenBackingScaleFactor
+        let roundedRect = selectionRect.standardized
+        
+        // 转换成物理像素坐标并四舍五入取整，消除浮点坐标插值与灰边误差
+        let px = max(0, min(CGFloat(backgroundCGImage.width), round(roundedRect.origin.x * scale)))
+        let py = max(0, min(CGFloat(backgroundCGImage.height), round((screenHeight - roundedRect.maxY) * scale)))
+        let pw = max(1, min(CGFloat(backgroundCGImage.width) - px, round(roundedRect.width * scale)))
+        let ph = max(1, min(CGFloat(backgroundCGImage.height) - py, round(roundedRect.height * scale)))
+        
+        let pixelRect = CGRect(x: px, y: py, width: pw, height: ph)
+        guard let croppedCG = backgroundCGImage.cropping(to: pixelRect) else { return nil }
+        
+        return NSImage(cgImage: croppedCG, size: roundedRect.size)
     }
     
     private func confirmSelection(action: FloatingToolbarAction) {

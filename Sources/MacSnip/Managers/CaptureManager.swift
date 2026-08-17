@@ -21,10 +21,18 @@ final class CaptureManager: NSObject, CaptureOverlayViewDelegate {
         guard !isCapturing else { return }
         isCapturing = true
         
+        // 1. 先关闭/隐藏本 App 自己的所有悬浮面板和遮罩，避免抓到自身 UI 残影
         closeAllOverlays()
+        for panel in activePanels {
+            panel.orderOut(nil)
+        }
+        activePanels.removeAll()
         
         Task { @MainActor in
             defer { self.isCapturing = false }
+            
+            // 2. 等待一帧（约 30ms），确保窗口系统彻底移除了自身 UI
+            try? await Task.sleep(nanoseconds: 30_000_000)
             
             do {
                 let screens = NSScreen.screens
@@ -47,7 +55,7 @@ final class CaptureManager: NSObject, CaptureOverlayViewDelegate {
     }
     
     /// 使用 ScreenCaptureKit 捕获所有显示器画面 (带 2 次重试，解决系统 XPC 瞬时冷启动抖动)
-    private func captureAllScreensSCKWithRetry(screens: [NSScreen], retries: Int = 2) async throws -> [(screen: NSScreen, image: NSImage)] {
+    private func captureAllScreensSCKWithRetry(screens: [NSScreen], retries: Int = 2) async throws -> [(screen: NSScreen, image: NSImage, cgImage: CGImage)] {
         guard #available(macOS 14.0, *) else {
             return []
         }
@@ -58,7 +66,21 @@ final class CaptureManager: NSObject, CaptureOverlayViewDelegate {
             do {
                 let shareableContent = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
                 
-                var results: [(screen: NSScreen, image: NSImage)] = []
+                // 排除本 App 自身的所有窗口（遮罩、工具条、设置、历史记录、置顶悬浮窗等），避免抓到自身 UI 残影
+                let currentPID = NSRunningApplication.current.processIdentifier
+                let currentBundleID = Bundle.main.bundleIdentifier
+                let myWindows = shareableContent.windows.filter { window in
+                    if let app = window.owningApplication {
+                        if app.processID == currentPID { return true }
+                        if let currentBID = currentBundleID, app.bundleIdentifier == currentBID { return true }
+                    }
+                    return false
+                }
+                
+                let myWinDescriptions = myWindows.map { "[\($0.windowID)] \($0.title ?? "untitled")" }.joined(separator: ", ")
+                print("MacSnip: SCK captured \(myWindows.count) self-windows to exclude: \(myWinDescriptions)")
+                
+                var results: [(screen: NSScreen, image: NSImage, cgImage: CGImage)] = []
                 
                 for screen in screens {
                     guard let screenNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else {
@@ -69,16 +91,22 @@ final class CaptureManager: NSObject, CaptureOverlayViewDelegate {
                         continue
                     }
                     
-                    let filter = SCContentFilter(display: scDisplay, excludingWindows: [])
+                    let filter = SCContentFilter(display: scDisplay, excludingWindows: myWindows)
                     let config = SCStreamConfiguration()
-                    config.width = scDisplay.width
-                    config.height = scDisplay.height
+                    
+                    // 【核心修复 1】按真实物理分辨率（Retina 2x/3x）配置，彻底杜绝 1x 降采样导致的模糊与拉伸
+                    let pixelWidth = Int(round(CGFloat(scDisplay.width) * screen.backingScaleFactor))
+                    let pixelHeight = Int(round(CGFloat(scDisplay.height) * screen.backingScaleFactor))
+                    config.width = pixelWidth
+                    config.height = pixelHeight
                     config.showsCursor = false
                     config.scalesToFit = false
                     
                     let cgImage = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+                    print("MacSnip: Screen '\(screen.localizedName)' captured CGImage size: \(cgImage.width)x\(cgImage.height) (Physical), Screen point size: \(screen.frame.size), Scale: \(screen.backingScaleFactor)")
+                    
                     let nsImage = NSImage(cgImage: cgImage, size: screen.frame.size)
-                    results.append((screen: screen, image: nsImage))
+                    results.append((screen: screen, image: nsImage, cgImage: cgImage))
                 }
                 
                 if !results.isEmpty {
@@ -100,12 +128,16 @@ final class CaptureManager: NSObject, CaptureOverlayViewDelegate {
         return []
     }
     
-    private func showOverlayWindows(for captured: [(screen: NSScreen, image: NSImage)]) {
+    private func showOverlayWindows(for captured: [(screen: NSScreen, image: NSImage, cgImage: CGImage)]) {
         let mouseLocation = NSEvent.mouseLocation
         var keyWindow: CaptureOverlayWindow?
         
         for item in captured {
-            let window = CaptureOverlayWindow(screen: item.screen, backgroundImage: item.image)
+            let window = CaptureOverlayWindow(
+                screen: item.screen,
+                backgroundImage: item.image,
+                backgroundCGImage: item.cgImage
+            )
             window.overlayView.delegate = self
             overlayWindows.append(window)
             window.orderFrontRegardless()
@@ -211,6 +243,12 @@ final class CaptureManager: NSObject, CaptureOverlayViewDelegate {
     
     private func copyToPasteboard(image: NSImage) {
         NSPasteboard.general.clearContents()
+        if let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+            let bitmapRep = NSBitmapImageRep(cgImage: cgImage)
+            if let pngData = bitmapRep.representation(using: .png, properties: [:]) {
+                NSPasteboard.general.setData(pngData, forType: .png)
+            }
+        }
         NSPasteboard.general.writeObjects([image])
     }
     

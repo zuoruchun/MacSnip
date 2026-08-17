@@ -4,6 +4,7 @@ import CoreImage
 
 final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
     let baseImage: NSImage
+    let scale: CGFloat
     let history = AnnotationHistory()
     
     var currentTool: AnnotationTool = .rectangle
@@ -23,8 +24,9 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
     var onHistoryChanged: (() -> Void)?
     var onCancelRequested: (() -> Void)?
     
-    init(frame: NSRect, baseImage: NSImage) {
+    init(frame: NSRect, baseImage: NSImage, scale: CGFloat = 2.0) {
         self.baseImage = baseImage
+        self.scale = scale
         super.init(frame: frame)
         self.wantsLayer = true
         self.layer?.borderWidth = 2.0
@@ -341,17 +343,53 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
     func renderCompositeImage() -> NSImage {
         commitActiveText()
         
-        let image = NSImage(size: bounds.size)
-        image.lockFocus()
+        let width = bounds.width
+        let height = bounds.height
+        let pixelWidth = Int(round(width * scale))
+        let pixelHeight = Int(round(height * scale))
         
-        if let context = NSGraphicsContext.current?.cgContext {
-            baseImage.draw(in: bounds)
-            for elem in history.elements {
-                drawElement(elem, in: context)
-            }
+        guard pixelWidth > 0, pixelHeight > 0,
+              let rep = NSBitmapImageRep(
+                bitmapDataPlanes: nil,
+                pixelsWide: pixelWidth,
+                pixelsHigh: pixelHeight,
+                bitsPerSample: 8,
+                samplesPerPixel: 4,
+                hasAlpha: true,
+                isPlanar: false,
+                colorSpaceName: .deviceRGB,
+                bytesPerRow: 0,
+                bitsPerPixel: 0
+              ) else {
+            return baseImage
         }
         
-        image.unlockFocus()
-        return image
+        rep.size = bounds.size
+        
+        NSGraphicsContext.saveGraphicsState()
+        guard let context = NSGraphicsContext(bitmapImageRep: rep) else {
+            NSGraphicsContext.restoreGraphicsState()
+            return baseImage
+        }
+        
+        NSGraphicsContext.current = context
+        let cgContext = context.cgContext
+        
+        // 缩放到物理像素坐标系进行矢量与高清绘制
+        cgContext.scaleBy(x: scale, y: scale)
+        
+        // 1. 绘制高清底图
+        baseImage.draw(in: bounds)
+        
+        // 2. 绘制所有标注矢量元素
+        for elem in history.elements {
+            drawElement(elem, in: cgContext)
+        }
+        
+        NSGraphicsContext.restoreGraphicsState()
+        
+        let finalImage = NSImage(size: bounds.size)
+        finalImage.addRepresentation(rep)
+        return finalImage
     }
 }

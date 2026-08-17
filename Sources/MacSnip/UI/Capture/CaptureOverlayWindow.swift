@@ -4,11 +4,13 @@ import AppKit
 final class CaptureOverlayWindow: NSWindow {
     let overlayView: CaptureOverlayView
     
-    init(screen: NSScreen, backgroundImage: NSImage) {
+    init(screen: NSScreen, backgroundImage: NSImage, backgroundCGImage: CGImage) {
         let screenFrame = screen.frame
         self.overlayView = CaptureOverlayView(
             frame: NSRect(origin: .zero, size: screenFrame.size),
-            backgroundImage: backgroundImage
+            backgroundImage: backgroundImage,
+            backgroundCGImage: backgroundCGImage,
+            screenBackingScaleFactor: screen.backingScaleFactor
         )
         
         super.init(
