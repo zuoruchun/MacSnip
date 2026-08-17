@@ -85,10 +85,11 @@ chmod +x scripts/build_app.sh
 
 点击菜单栏图标 → **偏好设置** → **AI 翻译配置**：
 
-| 供应商 | 模型 | 获取 API Key |
+| 供应商 | 格式 / 模型 | 凭证与获取地址 |
 |:---|:---|:---|
+| 阿里云通用翻译 | 机器翻译 (`TranslateGeneral`) | 免费100万字/月，填 `AK_ID:AK_Secret` [阿里云控制台](https://ram.console.aliyun.com) |
 | 智谱 GLM | `glm-4.7-flash`（免费） | [open.bigmodel.cn](https://open.bigmodel.cn) |
-| 通义翻译 | `qwen-mt-turbo`（阿里云专用翻译） | [dashscope.console.aliyun.com](https://dashscope.console.aliyun.com) |
+| 通义翻译 | `qwen-mt-turbo`（阿里云大模型） | [dashscope.console.aliyun.com](https://dashscope.console.aliyun.com) |
 | DeepSeek | `deepseek-v4-flash` | [platform.deepseek.com](https://platform.deepseek.com) |
 | 通义千问 | `qwen3.7-flash` | [dashscope.console.aliyun.com](https://dashscope.console.aliyun.com) |
 | OpenAI | `gpt-5.6-luna` | [platform.openai.com](https://platform.openai.com) |

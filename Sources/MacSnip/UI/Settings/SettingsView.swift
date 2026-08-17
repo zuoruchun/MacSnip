@@ -333,21 +333,21 @@ private struct AIProfileSettingsView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Base URL")
                                 .font(.caption.bold())
-                            TextField("例如: https://api.deepseek.com", text: $editingProfile.baseURL)
+                            TextField(editingProfile.format == .aliyunMT ? "例如: https://mt.aliyuncs.com" : "例如: https://api.deepseek.com", text: $editingProfile.baseURL)
                                 .textFieldStyle(.roundedBorder)
                         }
                         
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Model 名称")
+                            Text(editingProfile.format == .aliyunMT ? "Action 动作" : "Model 名称")
                                 .font(.caption.bold())
-                            TextField("例如: deepseek-v4-flash", text: $editingProfile.modelName)
+                            TextField(editingProfile.format == .aliyunMT ? "例如: TranslateGeneral (通用版) 或 TranslateStandard" : "例如: deepseek-v4-flash", text: $editingProfile.modelName)
                                 .textFieldStyle(.roundedBorder)
                         }
                         
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("API Key (支持 ⌘V 粘贴，保存在系统 Keychain)")
+                            Text(editingProfile.format == .aliyunMT ? "AccessKey 凭证 (格式: AccessKeyId:AccessKeySecret，保存在 Keychain)" : "API Key (支持 ⌘V 粘贴，保存在系统 Keychain)")
                                 .font(.caption.bold())
-                            SecureField("输入或粘贴 API Key", text: $editingApiKey)
+                            SecureField(editingProfile.format == .aliyunMT ? "输入 AccessKeyId:AccessKeySecret" : "输入或粘贴 API Key", text: $editingApiKey)
                                 .textFieldStyle(.roundedBorder)
                         }
                         

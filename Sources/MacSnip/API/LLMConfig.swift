@@ -4,6 +4,7 @@ import Foundation
 public enum LLMProviderFormat: String, Codable, CaseIterable, Identifiable {
     case openAICompatible = "openai"
     case anthropicNative = "anthropic"
+    case aliyunMT = "aliyun_mt"
     
     public var id: String { rawValue }
     
@@ -13,6 +14,8 @@ public enum LLMProviderFormat: String, Codable, CaseIterable, Identifiable {
             return "OpenAI 兼容"
         case .anthropicNative:
             return "Anthropic 原生"
+        case .aliyunMT:
+            return "阿里云机器翻译"
         }
     }
 }
@@ -54,15 +57,15 @@ public struct LLMPresetTemplate: Identifiable {
     public var notes: String
     
     public static let allPresets: [LLMPresetTemplate] = [
-        // 1. DeepSeek V4-Flash — 旧别名 deepseek-chat 已于 2026-07-24 停用
+        // 1. 阿里云官方通用机器翻译（每月100万字符免费额度，纯专用翻译引擎）
         LLMPresetTemplate(
-            id: "deepseek",
-            title: "DeepSeek V4-Flash",
-            defaultName: "DeepSeek",
-            defaultBaseURL: "https://api.deepseek.com",
-            defaultModelName: "deepseek-v4-flash",
-            format: .openAICompatible,
-            notes: "DeepSeek 最新旗舰轻量版，极高性价比"
+            id: "aliyun_mt",
+            title: "阿里云通用翻译 (免费 100万字符)",
+            defaultName: "阿里云通用翻译",
+            defaultBaseURL: "https://mt.aliyuncs.com",
+            defaultModelName: "TranslateGeneral",
+            format: .aliyunMT,
+            notes: "阿里云官方机器翻译通用版，极速响应，每月100万字符免费"
         ),
         
         // 2. 智谱 GLM-4.7-Flash — 免费额度，极速
@@ -76,15 +79,15 @@ public struct LLMPresetTemplate: Identifiable {
             notes: "智谱最新轻量免费模型，极速响应"
         ),
         
-        // 3. 阿里云通用翻译（通义翻译 Qwen-MT-Turbo）— 专用机器翻译大模型
+        // 3. DeepSeek V4-Flash
         LLMPresetTemplate(
-            id: "aliyun_qwen_mt",
-            title: "通义翻译 Qwen-MT",
-            defaultName: "通义翻译",
-            defaultBaseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-            defaultModelName: "qwen-mt-turbo",
+            id: "deepseek",
+            title: "DeepSeek V4-Flash",
+            defaultName: "DeepSeek",
+            defaultBaseURL: "https://api.deepseek.com",
+            defaultModelName: "deepseek-v4-flash",
             format: .openAICompatible,
-            notes: "阿里云百炼专用翻译模型，专精多语言通用互译"
+            notes: "DeepSeek 最新旗舰轻量版，极高性价比"
         ),
         
         // 4. 阿里云通义千问 Qwen3.7-Flash — 目前最低价

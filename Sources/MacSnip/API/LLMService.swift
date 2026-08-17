@@ -1,8 +1,10 @@
 import Foundation
+import CommonCrypto
 
 public enum LLMServiceError: LocalizedError {
     case invalidURL(String)
     case missingAPIKey
+    case invalidAPIKeyFormat(String)
     case networkError(String)
     case httpError(statusCode: Int, message: String)
     case invalidResponse
@@ -15,6 +17,8 @@ public enum LLMServiceError: LocalizedError {
             return "无效的 API 地址: \(url)"
         case .missingAPIKey:
             return "未配置 API Key，请在设置中添加。"
+        case .invalidAPIKeyFormat(let msg):
+            return "API Key 格式错误: \(msg)"
         case .networkError(let message):
             return "网络请求失败: \(message)"
         case .httpError(let statusCode, let message):
@@ -57,10 +61,12 @@ public final class LLMService {
             return try await requestOpenAI(text: text, profile: profile, apiKey: trimmedKey)
         case .anthropicNative:
             return try await requestAnthropic(text: text, profile: profile, apiKey: trimmedKey)
+        case .aliyunMT:
+            return try await requestAliyunMT(text: text, profile: profile, apiKey: trimmedKey)
         }
     }
     
-    // MARK: - OpenAI 兼容格式
+    // MARK: - 1. OpenAI 兼容格式
     
     /// 智能拼接 OpenAI 兼容接口 endpoint
     private func buildOpenAIEndpoint(from baseURL: String) -> String {
@@ -132,7 +138,6 @@ public final class LLMService {
             let errorBody = String(data: data, encoding: .utf8) ?? ""
             print("[AI Response Error] Body: \(errorBody)")
             
-            // 提取结构化错误信息
             let parsedMessage = parseErrorMessage(from: data) ?? errorBody
             throw LLMServiceError.httpError(statusCode: httpResponse.statusCode, message: parsedMessage)
         }
@@ -166,7 +171,7 @@ public final class LLMService {
         }
     }
     
-    // MARK: - Anthropic 原生格式
+    // MARK: - 2. Anthropic 原生格式
     
     /// 智能拼接 Anthropic 原生接口 endpoint
     private func buildAnthropicEndpoint(from baseURL: String) -> String {
@@ -269,6 +274,157 @@ public final class LLMService {
         }
     }
     
+    // MARK: - 3. 阿里云通用机器翻译 (Alibaba Cloud Machine Translation)
+    
+    private func requestAliyunMT(
+        text: String,
+        profile: LLMProfile,
+        apiKey: String
+    ) async throws -> String {
+        // API Key 格式: AccessKeyId:AccessKeySecret
+        let keyParts = apiKey.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: true)
+        guard keyParts.count == 2 else {
+            throw LLMServiceError.invalidAPIKeyFormat("阿里云机器翻译需要同时提供 AccessKey ID 和 AccessKey Secret，格式为: AccessKeyId:AccessKeySecret")
+        }
+        
+        let accessKeyId = String(keyParts[0]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let accessKeySecret = String(keyParts[1]).trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        guard !accessKeyId.isEmpty, !accessKeySecret.isEmpty else {
+            throw LLMServiceError.invalidAPIKeyFormat("AccessKey ID 或 AccessKey Secret 不能为空。")
+        }
+        
+        var base = profile.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        while base.hasSuffix("/") {
+            base.removeLast()
+        }
+        if base.isEmpty {
+            base = "https://mt.aliyuncs.com"
+        }
+        
+        let action = profile.modelName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "TranslateGeneral" : profile.modelName
+        
+        // 构造阿里云 POP RPC 请求参数
+        let dateFormatter = DateFormatter()
+        dateFormatter.locale = Locale(identifier: "en_US")
+        dateFormatter.timeZone = TimeZone(identifier: "UTC")
+        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'"
+        let timestamp = dateFormatter.string(from: Date())
+        let signatureNonce = UUID().uuidString
+        
+        var params: [String: String] = [
+            "Action": action,
+            "Format": "JSON",
+            "Version": "2018-10-12",
+            "AccessKeyId": accessKeyId,
+            "SignatureMethod": "HMAC-SHA1",
+            "Timestamp": timestamp,
+            "SignatureVersion": "1.0",
+            "SignatureNonce": signatureNonce,
+            "FormatType": "text",
+            "SourceLanguage": "auto",
+            "TargetLanguage": "zh",
+            "SourceText": text,
+            "Scene": "general"
+        ]
+        
+        // 计算签名 (POP RPC 签名算法)
+        let signature = generateAliyunSignature(params: params, secret: accessKeySecret, httpMethod: "POST")
+        params["Signature"] = signature
+        
+        // 构建 POST Body (x-www-form-urlencoded)
+        let bodyString = params.map { "\($0.key)=\(percentEncode($0.value))" }.joined(separator: "&")
+        guard let bodyData = bodyString.data(using: .utf8), let url = URL(string: base) else {
+            throw LLMServiceError.invalidURL(base)
+        }
+        
+        print("[AI Request] URL: \(base) (Aliyun MT) | Action: \(action) | AK: \(maskAPIKey(accessKeyId))")
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.httpBody = bodyData
+        
+        let (data, response) = try await performRequest(request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw LLMServiceError.invalidResponse
+        }
+        
+        print("[AI Response] Status: \(httpResponse.statusCode) | Bytes: \(data.count)")
+        
+        if !(200...299).contains(httpResponse.statusCode) {
+            let errorBody = String(data: data, encoding: .utf8) ?? ""
+            print("[AI Response Error] Body: \(errorBody)")
+            
+            let parsedMessage = parseErrorMessage(from: data) ?? errorBody
+            throw LLMServiceError.httpError(statusCode: httpResponse.statusCode, message: parsedMessage)
+        }
+        
+        struct AliyunMTResponse: Decodable {
+            struct DataBlock: Decodable {
+                let Translated: String?
+                let WordCount: String?
+            }
+            let Code: String?
+            let Message: String?
+            let Data: DataBlock?
+        }
+        
+        do {
+            let decoded = try JSONDecoder().decode(AliyunMTResponse.self, from: data)
+            if let code = decoded.Code, code != "200" {
+                let msg = decoded.Message ?? "错误码 \(code)"
+                throw LLMServiceError.httpError(statusCode: httpResponse.statusCode, message: msg)
+            }
+            guard let translated = decoded.Data?.Translated?.trimmingCharacters(in: .whitespacesAndNewlines), !translated.isEmpty else {
+                throw LLMServiceError.emptyResult
+            }
+            return translated
+        } catch let err as LLMServiceError {
+            throw err
+        } catch {
+            let rawBody = String(data: data, encoding: .utf8) ?? ""
+            print("[AI Decoding Error] \(error.localizedDescription) | Raw: \(rawBody)")
+            throw LLMServiceError.decodingError("解析阿里云响应失败: \(error.localizedDescription)")
+        }
+    }
+    
+    /// 阿里云 POP 规范化 Percent-Encoding (RFC 3986)
+    private func percentEncode(_ string: String) -> String {
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: "-_.~")
+        return string.addingPercentEncoding(withAllowedCharacters: allowed) ?? string
+    }
+    
+    /// 阿里云 POP API 签名计算 (HMAC-SHA1)
+    private func generateAliyunSignature(params: [String: String], secret: String, httpMethod: String) -> String {
+        // 1. 字典序排列
+        let sortedKeys = params.keys.sorted()
+        let canonicalizedQuery = sortedKeys.map { key in
+            "\(percentEncode(key))=\(percentEncode(params[key]!))"
+        }.joined(separator: "&")
+        
+        // 2. 构造待签名字符串
+        let stringToSign = "\(httpMethod)&%2F&" + percentEncode(canonicalizedQuery)
+        
+        // 3. HMAC-SHA1 计算
+        let key = secret + "&"
+        guard let keyData = key.data(using: .utf8),
+              let stringData = stringToSign.data(using: .utf8) else {
+            return ""
+        }
+        
+        var result = [UInt8](repeating: 0, count: Int(CC_SHA1_DIGEST_LENGTH))
+        stringData.withUnsafeBytes { strBytes in
+            keyData.withUnsafeBytes { keyBytes in
+                CCHmac(CCHmacAlgorithm(kCCHmacAlgSHA1), keyBytes.baseAddress, keyData.count, strBytes.baseAddress, stringData.count, &result)
+            }
+        }
+        
+        return Data(result).base64EncodedString()
+    }
+    
     private func performRequest(_ request: URLRequest) async throws -> (Data, URLResponse) {
         do {
             return try await urlSession.data(for: request)
@@ -294,6 +450,9 @@ public final class LLMService {
             return msg
         }
         if let msg = json["message"] as? String, !msg.isEmpty {
+            return msg
+        }
+        if let msg = json["Message"] as? String, !msg.isEmpty {
             return msg
         }
         return nil
