@@ -21,17 +21,16 @@ final class FloatingToolbarView: NSView {
         let isPrimary: Bool
     }
     
-    // 中间功能按钮组
+    // 左侧功能按钮组 (编辑、保存、OCR、翻译)
     private let toolButtons: [ToolbarButtonDef] = [
         ToolbarButtonDef(action: .edit, iconName: "pencil.and.outline", title: "标注编辑 (E)", isPrimary: false),
-        ToolbarButtonDef(action: .pin, iconName: "pin.fill", title: "贴在屏幕上 (P)", isPrimary: false),
         ToolbarButtonDef(action: .save, iconName: "square.and.arrow.down", title: "保存到历史 (S)", isPrimary: false),
         ToolbarButtonDef(action: .ocr, iconName: "text.viewfinder", title: "离线提取文字 (O)", isPrimary: false),
         ToolbarButtonDef(action: .translate, iconName: "globe", title: "AI 翻译 (T)", isPrimary: false),
     ]
     
     init() {
-        super.init(frame: NSRect(x: 0, y: 0, width: 280, height: 42))
+        super.init(frame: NSRect(x: 0, y: 0, width: 300, height: 46))
         setupUI()
     }
     
@@ -41,7 +40,7 @@ final class FloatingToolbarView: NSView {
     
     private func setupUI() {
         self.wantsLayer = true
-        self.layer?.cornerRadius = 10
+        self.layer?.cornerRadius = 11
         self.layer?.masksToBounds = false
         self.layer?.shadowColor = NSColor.black.cgColor
         self.layer?.shadowOpacity = 0.35
@@ -56,7 +55,7 @@ final class FloatingToolbarView: NSView {
         visualEffect.blendingMode = .behindWindow
         visualEffect.state = .active
         visualEffect.wantsLayer = true
-        visualEffect.layer?.cornerRadius = 10
+        visualEffect.layer?.cornerRadius = 11
         visualEffect.layer?.masksToBounds = true
         visualEffect.layer?.borderWidth = 1
         visualEffect.layer?.borderColor = NSColor.white.withAlphaComponent(0.18).cgColor
@@ -64,27 +63,34 @@ final class FloatingToolbarView: NSView {
         
         var currentX: CGFloat = 8
         
-        // 1. 中间功能按钮组 (编辑、贴图、保存、OCR、翻译)
+        // 1. 左侧功能按钮组 (编辑、保存、OCR、翻译) — 尺寸放大 1.1 倍
         for def in toolButtons {
-            let btn = createButton(def: def, width: 34, height: 32)
+            let btn = createButton(def: def, width: 38, height: 36)
             btn.frame.origin = NSPoint(x: currentX, y: 5)
             visualEffect.addSubview(btn)
-            currentX += 36
+            currentX += 40
         }
         
         // 2. 右侧操作区分隔线
         currentX += 2
-        let sep = NSBox(frame: NSRect(x: currentX, y: 9, width: 1, height: 24))
+        let sep = NSBox(frame: NSRect(x: currentX, y: 10, width: 1, height: 26))
         sep.boxType = .separator
         visualEffect.addSubview(sep)
         currentX += 10
         
-        // 3. 对号按钮 (推荐默认操作：确认并复制)
+        // 3. 置顶贴图按钮 (放置在对号左边，放大 1.1 倍)
+        let pinDef = ToolbarButtonDef(action: .pin, iconName: "pin.fill", title: "贴在屏幕上置顶 (P)", isPrimary: false)
+        let pinBtn = createButton(def: pinDef, width: 38, height: 36)
+        pinBtn.frame.origin = NSPoint(x: currentX, y: 5)
+        visualEffect.addSubview(pinBtn)
+        currentX += 42
+        
+        // 4. 对号按钮 (确认并复制，放大 1.1 倍)
         let checkDef = ToolbarButtonDef(action: .copy, iconName: "checkmark", title: "确认并复制 (Enter / 退出按 Esc)", isPrimary: true)
-        let checkBtn = createButton(def: checkDef, width: 38, height: 32)
+        let checkBtn = createButton(def: checkDef, width: 44, height: 36)
         checkBtn.frame.origin = NSPoint(x: currentX, y: 5)
         visualEffect.addSubview(checkBtn)
-        currentX += 42
+        currentX += 48
         
         self.frame.size.width = currentX + 4
     }
@@ -98,7 +104,7 @@ final class FloatingToolbarView: NSView {
         btn.title = ""
         
         if let img = NSImage(systemSymbolName: def.iconName, accessibilityDescription: def.title) {
-            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: def.isPrimary ? .bold : .medium)
+            let config = NSImage.SymbolConfiguration(pointSize: 16, weight: def.isPrimary ? .bold : .medium)
             btn.image = img.withSymbolConfiguration(config)
         }
         

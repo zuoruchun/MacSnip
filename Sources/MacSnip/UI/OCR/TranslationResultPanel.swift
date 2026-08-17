@@ -14,8 +14,8 @@ public final class TranslationResultPanel: NSPanel {
     public init(sourceText: String) {
         self.sourceText = sourceText
         
-        let width: CGFloat = 460
-        let height: CGFloat = 360
+        let width: CGFloat = 520
+        let height: CGFloat = 400
         
         var frame = NSRect(x: 300, y: 300, width: width, height: height)
         if let screen = NSScreen.main {
@@ -47,36 +47,36 @@ public final class TranslationResultPanel: NSPanel {
     }
     
     private func setupViews() {
-        let container = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 360))
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 520, height: 400))
         container.autoresizingMask = [.width, .height]
         
         // 状态文案
-        statusLabel.frame = NSRect(x: 16, y: 320, width: 380, height: 24)
+        statusLabel.frame = NSRect(x: 16, y: 360, width: 440, height: 24)
         statusLabel.isEditable = false
         statusLabel.isSelectable = false
         statusLabel.isBordered = false
         statusLabel.backgroundColor = .clear
         statusLabel.stringValue = "正在请求 AI 模型翻译..."
-        statusLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        statusLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
         statusLabel.textColor = .secondaryLabelColor
         container.addSubview(statusLabel)
         
         // 进度转轮
-        progressIndicator.frame = NSRect(x: 420, y: 322, width: 20, height: 20)
+        progressIndicator.frame = NSRect(x: 480, y: 362, width: 20, height: 20)
         progressIndicator.style = .spinning
         progressIndicator.controlSize = .small
         progressIndicator.startAnimation(nil)
         container.addSubview(progressIndicator)
         
-        // 文本展示滚动区域
-        let scrollView = NSScrollView(frame: NSRect(x: 16, y: 60, width: 428, height: 250))
+        // 文本展示滚动区域 (字体放大 1.3 倍)
+        let scrollView = NSScrollView(frame: NSRect(x: 16, y: 60, width: 488, height: 290))
         scrollView.autoresizingMask = [.width, .height]
         scrollView.hasVerticalScroller = true
         scrollView.borderType = .bezelBorder
         
         resultTextView.frame = scrollView.contentView.bounds
         resultTextView.autoresizingMask = [.width, .height]
-        resultTextView.font = NSFont.systemFont(ofSize: 13)
+        resultTextView.font = NSFont.systemFont(ofSize: 17)
         resultTextView.isEditable = false
         resultTextView.isSelectable = true
         resultTextView.string = "正在等待翻译响应..."
@@ -94,7 +94,7 @@ public final class TranslationResultPanel: NSPanel {
         container.addSubview(copyButton)
         
         // 关闭按钮
-        closeButton.frame = NSRect(x: 364, y: 16, width: 80, height: 32)
+        closeButton.frame = NSRect(x: 424, y: 16, width: 80, height: 32)
         closeButton.bezelStyle = .rounded
         closeButton.title = "关闭"
         closeButton.target = self

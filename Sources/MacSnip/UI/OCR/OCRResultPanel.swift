@@ -9,8 +9,8 @@ public final class OCRResultPanel: NSPanel {
         self.recognizedText = recognizedText
         self.onTranslateRequested = onTranslate
         
-        let width: CGFloat = 420
-        let height: CGFloat = 320
+        let width: CGFloat = 480
+        let height: CGFloat = 360
         
         var frame = NSRect(x: 300, y: 300, width: width, height: height)
         if let screen = NSScreen.main {
@@ -39,11 +39,11 @@ public final class OCRResultPanel: NSPanel {
     }
     
     private func setupViews() {
-        let container = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 320))
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 480, height: 360))
         container.autoresizingMask = [.width, .height]
         
-        // 滚动文本框
-        let scrollView = NSScrollView(frame: NSRect(x: 16, y: 60, width: 388, height: 244))
+        // 滚动文本框 (字体放大 1.3 倍)
+        let scrollView = NSScrollView(frame: NSRect(x: 16, y: 60, width: 448, height: 284))
         scrollView.autoresizingMask = [.width, .height]
         scrollView.hasVerticalScroller = true
         scrollView.borderType = .bezelBorder
@@ -51,7 +51,7 @@ public final class OCRResultPanel: NSPanel {
         let textView = NSTextView(frame: scrollView.contentView.bounds)
         textView.autoresizingMask = [.width, .height]
         textView.string = recognizedText
-        textView.font = NSFont.systemFont(ofSize: 13)
+        textView.font = NSFont.systemFont(ofSize: 17)
         textView.isEditable = true
         textView.isSelectable = true
         
@@ -75,7 +75,7 @@ public final class OCRResultPanel: NSPanel {
         container.addSubview(translateButton)
         
         // 关闭按钮
-        let closeBtn = NSButton(frame: NSRect(x: 324, y: 16, width: 80, height: 32))
+        let closeBtn = NSButton(frame: NSRect(x: 384, y: 16, width: 80, height: 32))
         closeBtn.bezelStyle = .rounded
         closeBtn.title = "关闭"
         closeBtn.target = self
