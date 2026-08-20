@@ -20,6 +20,8 @@ final class CaptureManager: NSObject, CaptureOverlayViewDelegate {
     func startCapture() {
         guard !isCapturing else { return }
         isCapturing = true
+
+        let needsWindowServerFlush = !overlayWindows.isEmpty || activePanels.contains { $0.isVisible }
         
         // 1. 先关闭/隐藏本 App 自己的所有悬浮面板和遮罩，避免抓到自身 UI 残影
         closeAllOverlays()
@@ -31,8 +33,10 @@ final class CaptureManager: NSObject, CaptureOverlayViewDelegate {
         Task { @MainActor in
             defer { self.isCapturing = false }
             
-            // 2. 等待一帧（约 30ms），确保窗口系统彻底移除了自身 UI
-            try? await Task.sleep(nanoseconds: 30_000_000)
+            // 只有刚隐藏过本 App 自身窗口时才等待窗口服务器完成刷新。
+            if needsWindowServerFlush {
+                try? await Task.sleep(nanoseconds: 30_000_000)
+            }
             
             do {
                 let screens = NSScreen.screens
@@ -148,12 +152,10 @@ final class CaptureManager: NSObject, CaptureOverlayViewDelegate {
         }
         
         let targetWindow = keyWindow ?? overlayWindows.first
-        targetWindow?.makeKeyAndOrderFront(nil)
+        targetWindow?.makeKey()
         if let overlay = targetWindow?.overlayView {
             targetWindow?.makeFirstResponder(overlay)
         }
-        
-        NSApp.activate(ignoringOtherApps: true)
         
         // 瞬间将全局光标设置为十字
         if !isCursorPushed {

@@ -1,7 +1,7 @@
 import Foundation
 import AppKit
 
-final class CaptureOverlayWindow: NSWindow {
+final class CaptureOverlayWindow: NSPanel {
     let overlayView: CaptureOverlayView
     
     init(screen: NSScreen, backgroundImage: NSImage, backgroundCGImage: CGImage) {
@@ -14,7 +14,7 @@ final class CaptureOverlayWindow: NSWindow {
         
         super.init(
             contentRect: NSRect(origin: .zero, size: screenFrame.size),
-            styleMask: [.borderless],
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
@@ -26,6 +26,8 @@ final class CaptureOverlayWindow: NSWindow {
         self.isOpaque = false
         self.backgroundColor = .clear
         self.hasShadow = false
+        self.hidesOnDeactivate = false
+        self.becomesKeyOnlyIfNeeded = false
         self.contentView = overlayView
         self.isReleasedWhenClosed = false
         self.ignoresMouseEvents = false
@@ -33,7 +35,7 @@ final class CaptureOverlayWindow: NSWindow {
     }
     
     override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { true }
+    override var canBecomeMain: Bool { false }
     
     override func cancelOperation(_ sender: Any?) {
         overlayView.handleCancel()

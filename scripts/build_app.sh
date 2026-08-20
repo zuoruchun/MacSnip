@@ -57,9 +57,9 @@ cat > "${CONTENTS_DIR}/Info.plist" << 'EOF'
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.1.0</string>
+    <string>1.1.1</string>
     <key>CFBundleVersion</key>
-    <string>2</string>
+    <string>3</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>LSUIElement</key>
@@ -78,10 +78,10 @@ codesign --force --deep --sign - -i com.macsnip.app "${APP_BUNDLE}"
 echo "==> MacSnip.app successfully built and signed at: ${APP_BUNDLE}"
 
 # 打包 ZIP 发布包
-ZIP_PATH="${ROOT_DIR}/build/MacSnip-v1.1.0-macOS-arm64.zip"
+ZIP_PATH="${ROOT_DIR}/build/MacSnip-v1.1.1-macOS-arm64.zip"
 echo "==> Creating release zip at ${ZIP_PATH}..."
 rm -f "${ZIP_PATH}"
-(cd "${ROOT_DIR}/build" && zip -r -q -y "MacSnip-v1.1.0-macOS-arm64.zip" "MacSnip.app")
+(cd "${ROOT_DIR}/build" && zip -r -q -y "MacSnip-v1.1.1-macOS-arm64.zip" "MacSnip.app")
 echo "==> Release zip created: ${ZIP_PATH}"
 
 # 安装到 /Applications
